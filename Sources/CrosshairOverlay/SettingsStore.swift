@@ -15,6 +15,21 @@ final class SettingsStore: @unchecked Sendable {
     var dotShadeColor: NSColor = NSColor.black
     var showDotShade: Bool = true
     var hideNativeCursor: Bool = true
+    var opacity: CGFloat = 1.0
+    var lineGap: CGFloat = 0
+    var cursorOffset = CGPoint.zero
+    var fadeAfterSeconds: TimeInterval = 0
+    var displayMode: OverlayDisplayMode = .activeDisplayOnly
+    var cursorMode: CursorMode = .experimentalBackground
+    var reticle: ReticleStyle = .cross
+    var holdToShow = false
+    var excludedBundleIdentifiers = Set<String>()
+    var displayProfiles = DisplayProfiles(defaultSettings: .default)
+    var presetLibrary = PresetLibrary.builtIn
+    var appProfiles = AppProfiles(defaultSettings: .default)
+    var fullAppProfiles = FullAppProfiles(defaultConfiguration: .default)
+    private(set) var activeDisplayIdentifier: String?
+    private var activeApplicationIdentifier: String?
 
     var shouldHideNativeCursor: Bool {
         CursorVisibilityPolicy.shouldHideCursor(
@@ -25,6 +40,97 @@ final class SettingsStore: @unchecked Sendable {
 
     var dotShadeCGColor: CGColor {
         showDotShade ? dotShadeColor.cgColor : NSColor.clear.cgColor
+    }
+
+    var advancedSettings: AdvancedOverlaySettings {
+        AdvancedOverlaySettings(
+            opacity: Double(opacity),
+            lineGap: Double(lineGap),
+            offsetX: cursorOffset.x,
+            offsetY: cursorOffset.y,
+            fadeAfterSeconds: fadeAfterSeconds,
+            displayMode: displayMode,
+            cursorMode: cursorMode,
+            reticle: reticle
+        )
+    }
+
+    func apply(_ advanced: AdvancedOverlaySettings) {
+        opacity = advanced.opacity
+        lineGap = advanced.lineGap
+        cursorOffset = CGPoint(x: advanced.offset.x, y: advanced.offset.y)
+        fadeAfterSeconds = advanced.fadeAfterSeconds
+        displayMode = advanced.displayMode
+        cursorMode = advanced.cursorMode
+        reticle = advanced.reticle
+    }
+
+    var appearanceConfiguration: CrosshairAppearanceConfiguration {
+        CrosshairAppearanceConfiguration(
+            lineColor: rgba(crosshairColor),
+            lineWidth: Double(lineWidth),
+            pattern: CrosshairLinePattern(rawValue: pattern.description.lowercased()) ?? .dashed,
+            dotColor: rgba(dotColor),
+            shadeColor: rgba(dotShadeColor),
+            showDot: showDot,
+            showShade: showDotShade
+        )
+    }
+
+    var configuration: CrosshairConfiguration {
+        CrosshairConfiguration(
+            advanced: advancedSettings,
+            appearance: appearanceConfiguration,
+            isVisible: isVisible,
+            hideNativeCursor: hideNativeCursor,
+            holdToShow: holdToShow
+        )
+    }
+
+    func apply(_ configuration: CrosshairConfiguration) {
+        apply(configuration.advanced)
+        crosshairColor = color(configuration.appearance.lineColor)
+        lineWidth = CGFloat(configuration.appearance.lineWidth)
+        pattern = LinePattern.from(description: configuration.appearance.pattern.rawValue.capitalized) ?? .dashed
+        dotColor = color(configuration.appearance.dotColor)
+        dotShadeColor = color(configuration.appearance.shadeColor)
+        showDot = configuration.appearance.showDot
+        showDotShade = configuration.appearance.showShade
+        isVisible = configuration.isVisible
+        hideNativeCursor = configuration.hideNativeCursor
+        holdToShow = configuration.holdToShow
+    }
+
+    func activateDisplayProfile(_ identifier: String) {
+        guard activeDisplayIdentifier != identifier else { return }
+        activeDisplayIdentifier = identifier
+        if let profile = displayProfiles.perDisplay[identifier] {
+            apply(profile)
+        }
+    }
+
+    func activateAppProfile(_ bundleIdentifier: String?) {
+        guard activeApplicationIdentifier != bundleIdentifier else { return }
+        activeApplicationIdentifier = bundleIdentifier
+        apply(fullAppProfiles.configuration(for: bundleIdentifier))
+    }
+
+    func saveAppProfile(_ bundleIdentifier: String) {
+        fullAppProfiles.save(bundleIdentifier: bundleIdentifier, configuration: configuration)
+    }
+
+    func removeAppProfile(_ bundleIdentifier: String) {
+        fullAppProfiles.profiles.removeAll { $0.bundleIdentifier == bundleIdentifier }
+    }
+
+    func saveActiveDisplayProfile() {
+        guard let activeDisplayIdentifier else { return }
+        displayProfiles.perDisplay[activeDisplayIdentifier] = advancedSettings
+    }
+
+    func removeActiveDisplayProfile() {
+        guard let activeDisplayIdentifier else { return }
+        displayProfiles.perDisplay.removeValue(forKey: activeDisplayIdentifier)
     }
 
     enum IntersectionShape: String {
@@ -86,7 +192,7 @@ final class SettingsStore: @unchecked Sendable {
     private let savedSettingsKey = "CrosshairOverlay.savedSettings"
 
     func save() {
-        let values: [String: Any] = [
+        var values: [String: Any] = [
             "crosshairColor": archive(crosshairColor),
             "lineWidth": Double(lineWidth),
             "pattern": pattern.description,
@@ -96,8 +202,15 @@ final class SettingsStore: @unchecked Sendable {
             "dotColor": archive(dotColor),
             "dotShadeColor": archive(dotShadeColor),
             "showDotShade": showDotShade,
-            "hideNativeCursor": hideNativeCursor
+            "hideNativeCursor": hideNativeCursor,
+            "advancedSettings": advancedSettings.encoded(),
+            "holdToShow": holdToShow,
+            "excludedBundleIdentifiers": Array(excludedBundleIdentifiers).sorted()
         ]
+        if let data = try? JSONEncoder().encode(displayProfiles) { values["displayProfiles"] = data }
+        if let data = try? JSONEncoder().encode(presetLibrary) { values["presetLibrary"] = data }
+        if let data = try? JSONEncoder().encode(appProfiles) { values["appProfiles"] = data }
+        if let data = try? JSONEncoder().encode(fullAppProfiles) { values["fullAppProfiles"] = data }
         UserDefaults.standard.set(values, forKey: savedSettingsKey)
     }
 
@@ -116,6 +229,21 @@ final class SettingsStore: @unchecked Sendable {
         if let data = values["dotShadeColor"] as? Data, let color = unarchive(data) { dotShadeColor = color }
         if let value = values["showDotShade"] as? Bool { showDotShade = value }
         if let value = values["hideNativeCursor"] as? Bool { hideNativeCursor = value }
+        if let data = values["advancedSettings"] as? Data, let advanced = try? AdvancedOverlaySettings.decode(from: data) { apply(advanced) }
+        if let value = values["holdToShow"] as? Bool { holdToShow = value }
+        if let values = values["excludedBundleIdentifiers"] as? [String] { excludedBundleIdentifiers = Set(values) }
+        if let data = values["displayProfiles"] as? Data, let profiles = try? JSONDecoder().decode(DisplayProfiles.self, from: data) { displayProfiles = profiles }
+        if let data = values["presetLibrary"] as? Data, let library = try? JSONDecoder().decode(PresetLibrary.self, from: data) { presetLibrary = library }
+        if let data = values["appProfiles"] as? Data, let profiles = try? JSONDecoder().decode(AppProfiles.self, from: data) {
+            appProfiles = profiles
+        } else {
+            appProfiles.defaultSettings = advancedSettings
+        }
+        if let data = values["fullAppProfiles"] as? Data, let profiles = try? JSONDecoder().decode(FullAppProfiles.self, from: data) {
+            fullAppProfiles = profiles
+        } else {
+            fullAppProfiles = FullAppProfiles(legacyProfiles: appProfiles, defaultConfiguration: configuration)
+        }
         return true
     }
 
@@ -125,5 +253,19 @@ final class SettingsStore: @unchecked Sendable {
 
     private func unarchive(_ data: Data) -> NSColor? {
         try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data)
+    }
+
+    private func rgba(_ color: NSColor) -> RGBAColor {
+        let resolved = color.usingColorSpace(.deviceRGB) ?? color
+        return RGBAColor(
+            red: Double(resolved.redComponent),
+            green: Double(resolved.greenComponent),
+            blue: Double(resolved.blueComponent),
+            alpha: Double(resolved.alphaComponent)
+        )
+    }
+
+    private func color(_ rgba: RGBAColor) -> NSColor {
+        NSColor(red: rgba.red, green: rgba.green, blue: rgba.blue, alpha: rgba.alpha)
     }
 }

@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = settings.restore()
+        settings.displayMode = .activeDisplayOnly
         // Use regular activation policy so status item menus work properly
         NSApp.setActivationPolicy(.regular)
 
@@ -50,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlayPanel: overlayPanel,
             cursorController: cursorController
         )
-        cursorController.apply(setting: settings.shouldHideNativeCursor)
+        cursorController.apply(setting: effectiveCursorHiding)
         installGlobalHotkeys()
 
         // Use a high-frequency timer for reliable cursor tracking (works even when mouse button is held)
@@ -62,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let timer = Timer(timeInterval: 0.016, repeats: true) { _ in
                 let location = NSEvent.mouseLocation
                 Task { @MainActor in
-                    if settings.shouldHideNativeCursor {
+                    if settings.shouldHideNativeCursor && settings.cursorMode == .experimentalBackground {
                         cursorController.reassertHidden()
                     }
                     panel.updateCursorLocation(location)
@@ -75,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Global monitor for cursor hiding when app is not active (e.g., during drag in other apps)
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: { _ in
-            if self.settings.shouldHideNativeCursor {
+            if self.effectiveCursorHiding {
                 self.cursorController.reassertHidden()
             }
         }) {
@@ -84,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Also hide cursor during drag events (when other apps capture mouse)
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { _ in
-            if self.settings.shouldHideNativeCursor {
+            if self.effectiveCursorHiding {
                 self.cursorController.reassertHidden()
             }
         }) {
@@ -93,12 +94,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Reapply the effective cursor state when a drag ends.
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp, .otherMouseUp], handler: { _ in
-            self.cursorController.apply(setting: self.settings.shouldHideNativeCursor)
+            self.cursorController.apply(setting: self.effectiveCursorHiding)
         }) {
             eventMonitorTokens.append(monitor)
         }
 
         print("Crosshair Overlay started. Ctrl+Shift+Cmd+C toggles crosshair lines; Ctrl+Shift+Cmd+H toggles native cursor hiding.")
+    }
+
+    private var effectiveCursorHiding: Bool {
+        settings.shouldHideNativeCursor && settings.cursorMode == .experimentalBackground
     }
 
     private func installGlobalHotkeys() {
@@ -145,7 +150,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let modifiers = UInt32(controlKey | shiftKey | cmdKey)
-        for (keyCode, identifier) in [(UInt32(kVK_ANSI_C), UInt32(1)), (UInt32(kVK_ANSI_H), UInt32(2))] {
+        for (keyCode, identifier) in [
+            (UInt32(kVK_ANSI_C), UInt32(1)),
+            (UInt32(kVK_ANSI_H), UInt32(2)),
+            (UInt32(kVK_ANSI_P), UInt32(3)),
+            (UInt32(kVK_ANSI_LeftBracket), UInt32(4)),
+            (UInt32(kVK_ANSI_RightBracket), UInt32(5)),
+            (UInt32(kVK_ANSI_Minus), UInt32(6)),
+            (UInt32(kVK_ANSI_Equal), UInt32(7))
+        ] {
             var reference: EventHotKeyRef?
             let status = RegisterEventHotKey(
                 keyCode,
@@ -170,6 +183,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuController.toggleCrosshair()
         case .toggleNativeCursor:
             menuController.toggleNativeCursor()
+        case .nextPreset:
+            menuController.cyclePreset()
+        case .decreaseLineWidth:
+            menuController.adjustLineWidth(by: -1)
+        case .increaseLineWidth:
+            menuController.adjustLineWidth(by: 1)
+        case .decreaseOpacity:
+            menuController.adjustOpacity(by: -1)
+        case .increaseOpacity:
+            menuController.adjustOpacity(by: 1)
         }
     }
 

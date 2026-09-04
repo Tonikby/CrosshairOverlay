@@ -1,10 +1,13 @@
 import Cocoa
+import Quartz
+import CrosshairCore
 
 @MainActor
 class OverlayPanel: NSPanel {
     var crosshairView: CrosshairView!
     var settings: SettingsStore
     var cursorLocation: NSPoint = NSZeroPoint
+    private var lastPointerMove = Date()
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -33,16 +36,55 @@ class OverlayPanel: NSPanel {
     }
 
     func updateCursorLocation(_ location: NSPoint) {
+        if location != cursorLocation {
+            lastPointerMove = Date()
+        }
         cursorLocation = location
+
+        let frontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        settings.activateAppProfile(frontmostBundleIdentifier)
+        if settings.excludedBundleIdentifiers.contains(frontmostBundleIdentifier ?? "") {
+            orderOut(nil)
+            return
+        }
+        let optionIsHeld = CGEventSource.flagsState(.combinedSessionState).contains(.maskAlternate)
+        if settings.holdToShow && !optionIsHeld {
+            orderOut(nil)
+            return
+        }
 
         // Find the screen containing this point
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(location) }) else { return }
+        let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        let displayIdentifier = screenNumber?.stringValue ?? screen.localizedName
+        settings.activateDisplayProfile(displayIdentifier)
+        let descriptor = DisplayDescriptor(
+            isMain: screen == NSScreen.main,
+            isBuiltIn: screenNumber.map { CGDisplayIsBuiltin(CGDirectDisplayID($0.uint32Value)) != 0 } ?? false
+        )
+        switch settings.displayMode {
+        case .activeDisplayOnly, .allDisplays:
+            break
+        case .externalOnly where descriptor.isBuiltIn:
+            orderOut(nil)
+            return
+        case .mainDisplayOnly where !descriptor.isMain:
+            orderOut(nil)
+            return
+        default:
+            break
+        }
 
         // Resize panel to match screen frame
         self.setFrame(screen.frame, display: true, animate: false)
 
         // Update crosshair position and redraw
-        crosshairView.cursorLocation = location
+        crosshairView.cursorLocation = NSPoint(
+            x: location.x + settings.cursorOffset.x,
+            y: location.y + settings.cursorOffset.y
+        )
+        let shouldFade = settings.fadeAfterSeconds > 0 && Date().timeIntervalSince(lastPointerMove) >= settings.fadeAfterSeconds
+        alphaValue = shouldFade ? 0 : settings.opacity
         crosshairView.needsDisplay = true
 
         // Show if visible
@@ -110,15 +152,15 @@ class CrosshairView: NSView {
             context.setLineDash(phase: 0, lengths: [2.0, 4.0])
         }
 
-        // Vertical crosshair line (full height)
+        let gap = settings.lineGap / 2
         context.beginPath()
         context.move(to: NSPoint(x: clampedX, y: bounds.minY))
+        context.addLine(to: NSPoint(x: clampedX, y: clampedY - gap))
+        context.move(to: NSPoint(x: clampedX, y: clampedY + gap))
         context.addLine(to: NSPoint(x: clampedX, y: bounds.maxY))
-        context.strokePath()
-
-        // Horizontal crosshair line (full width)
-        context.beginPath()
         context.move(to: NSPoint(x: bounds.minX, y: clampedY))
+        context.addLine(to: NSPoint(x: clampedX - gap, y: clampedY))
+        context.move(to: NSPoint(x: clampedX + gap, y: clampedY))
         context.addLine(to: NSPoint(x: bounds.maxX, y: clampedY))
         context.strokePath()
 
@@ -126,7 +168,7 @@ class CrosshairView: NSView {
         if settings.showDot {
             context.setLineDash(phase: 0, lengths: []) // Reset dash pattern
             
-            switch settings.intersectionShape {
+            switch settings.reticle {
             case .circle:
                 drawCircleMarker(context, x: clampedX, y: clampedY)
                 
@@ -141,6 +183,16 @@ class CrosshairView: NSView {
                 
             case .diamond:
                 drawDiamondMarker(context, x: clampedX, y: clampedY)
+            case .t:
+                drawTMarker(context, x: clampedX, y: clampedY)
+            case .ring:
+                drawRingMarker(context, x: clampedX, y: clampedY)
+            case .chevron:
+                drawChevronMarker(context, x: clampedX, y: clampedY)
+            case .fourCorners:
+                drawFourCornersMarker(context, x: clampedX, y: clampedY)
+            case .hollowSquare:
+                drawHollowSquareMarker(context, x: clampedX, y: clampedY)
             }
         }
     }
@@ -323,5 +375,58 @@ class CrosshairView: NSView {
         context.beginPath()
         context.addArc(center: NSPoint(x: x, y: y), radius: 1.5, startAngle: 0, endAngle: .pi * 2, clockwise: false)
         context.fillPath()
+    }
+
+    private func strokeMarker(_ context: CGContext, points: [NSPoint], closes: Bool = false) {
+        context.setLineDash(phase: 0, lengths: [])
+        context.setStrokeColor(settings.dotShadeCGColor)
+        context.setLineWidth(5)
+        context.beginPath()
+        context.move(to: points[0])
+        for point in points.dropFirst() { context.addLine(to: point) }
+        if closes { context.closePath() }
+        context.strokePath()
+        context.setStrokeColor(settings.dotColor.cgColor)
+        context.setLineWidth(3)
+        context.beginPath()
+        context.move(to: points[0])
+        for point in points.dropFirst() { context.addLine(to: point) }
+        if closes { context.closePath() }
+        context.strokePath()
+    }
+
+    private func drawTMarker(_ context: CGContext, x: CGFloat, y: CGFloat) {
+        strokeMarker(context, points: [.init(x: x - 8, y: y + 8), .init(x: x + 8, y: y + 8), .init(x: x, y: y + 8), .init(x: x, y: y - 8)])
+    }
+
+    private func drawRingMarker(_ context: CGContext, x: CGFloat, y: CGFloat) {
+        context.setLineDash(phase: 0, lengths: [])
+        context.setStrokeColor(settings.dotShadeCGColor)
+        context.setLineWidth(5)
+        context.addEllipse(in: NSRect(x: x - 9, y: y - 9, width: 18, height: 18))
+        context.strokePath()
+        context.setStrokeColor(settings.dotColor.cgColor)
+        context.setLineWidth(3)
+        context.addEllipse(in: NSRect(x: x - 9, y: y - 9, width: 18, height: 18))
+        context.strokePath()
+    }
+
+    private func drawChevronMarker(_ context: CGContext, x: CGFloat, y: CGFloat) {
+        strokeMarker(context, points: [.init(x: x - 9, y: y + 5), .init(x: x, y: y - 5), .init(x: x + 9, y: y + 5)])
+    }
+
+    private func drawFourCornersMarker(_ context: CGContext, x: CGFloat, y: CGFloat) {
+        let d: CGFloat = 9
+        for points in [
+            [NSPoint(x: x - d, y: y + 3), NSPoint(x: x - d, y: y + d), NSPoint(x: x - 3, y: y + d)],
+            [NSPoint(x: x + 3, y: y + d), NSPoint(x: x + d, y: y + d), NSPoint(x: x + d, y: y + 3)],
+            [NSPoint(x: x + d, y: y - 3), NSPoint(x: x + d, y: y - d), NSPoint(x: x + 3, y: y - d)],
+            [NSPoint(x: x - 3, y: y - d), NSPoint(x: x - d, y: y - d), NSPoint(x: x - d, y: y - 3)]
+        ] { strokeMarker(context, points: points) }
+    }
+
+    private func drawHollowSquareMarker(_ context: CGContext, x: CGFloat, y: CGFloat) {
+        let d: CGFloat = 8
+        strokeMarker(context, points: [.init(x: x - d, y: y - d), .init(x: x - d, y: y + d), .init(x: x + d, y: y + d), .init(x: x + d, y: y - d)], closes: true)
     }
 }
