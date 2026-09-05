@@ -300,6 +300,14 @@ public struct CrosshairConfiguration: Codable, Equatable, Sendable {
 }
 
 public enum OverlayProfileResolver {
+    public static func fallbackConfiguration(
+        base: CrosshairConfiguration,
+        current: CrosshairConfiguration,
+        activeAppConfiguration: CrosshairConfiguration?
+    ) -> CrosshairConfiguration {
+        activeAppConfiguration == nil ? current : base
+    }
+
     public static func configuration(
         base: CrosshairConfiguration,
         displaySettings: AdvancedOverlaySettings?,

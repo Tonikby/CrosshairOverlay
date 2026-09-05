@@ -252,6 +252,34 @@ final class CursorVisibilityTests: XCTestCase {
         )
     }
 
+    func testSwitchingFromAnUnprofiledAppKeepsCurrentConfigurationAsFallback() {
+        let current = CrosshairConfiguration(
+            advanced: .init(opacity: 0.6, lineGap: 12, reticle: .ring),
+            appearance: .init(
+                lineColor: .init(red: 1, green: 0, blue: 0, alpha: 1),
+                lineWidth: 4,
+                pattern: .solid,
+                dotColor: .init(red: 0, green: 1, blue: 1, alpha: 1),
+                shadeColor: .init(red: 0, green: 0, blue: 0, alpha: 1),
+                showDot: false,
+                showShade: false
+            ),
+            isVisible: true,
+            hideNativeCursor: false,
+            holdToShow: true,
+            optionKeyBehavior: .toggleNativeCursor
+        )
+
+        XCTAssertEqual(
+            OverlayProfileResolver.fallbackConfiguration(
+                base: .default,
+                current: current,
+                activeAppConfiguration: nil
+            ),
+            current
+        )
+    }
+
     func testConfigurationExportUsesVersionedValidatedEnvelope() throws {
         let original = AdvancedOverlaySettings(opacity: 0.45, lineGap: 12, reticle: .chevron)
         let data = ConfigurationExport(settings: original).encoded()

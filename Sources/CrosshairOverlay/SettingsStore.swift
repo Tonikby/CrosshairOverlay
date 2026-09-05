@@ -122,6 +122,11 @@ final class SettingsStore: @unchecked Sendable {
 
     func activateAppProfile(_ bundleIdentifier: String?) {
         guard activeApplicationIdentifier != bundleIdentifier else { return }
+        fullAppProfiles.defaultConfiguration = OverlayProfileResolver.fallbackConfiguration(
+            base: fullAppProfiles.defaultConfiguration,
+            current: configuration,
+            activeAppConfiguration: fullAppProfiles.profile(for: activeApplicationIdentifier)
+        )
         activeApplicationIdentifier = bundleIdentifier
         applyActiveProfileOverrides()
     }
