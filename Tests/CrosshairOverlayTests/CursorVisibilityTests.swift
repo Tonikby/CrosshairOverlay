@@ -85,6 +85,78 @@ final class CursorVisibilityTests: XCTestCase {
         ))
     }
 
+    func testOptionKeyCanSwitchFromCrosshairHoldToCursorToggle() {
+        XCTAssertFalse(OptionKeyBehaviorPolicy.shouldShowCrosshair(
+            behavior: .showCrosshair,
+            isOptionPressed: false
+        ))
+        XCTAssertTrue(OptionKeyBehaviorPolicy.shouldShowCrosshair(
+            behavior: .showCrosshair,
+            isOptionPressed: true
+        ))
+        XCTAssertTrue(OptionKeyBehaviorPolicy.shouldShowCrosshair(
+            behavior: .toggleNativeCursor,
+            isOptionPressed: false
+        ))
+        XCTAssertFalse(OptionKeyBehaviorPolicy.shouldHideNativeCursor(
+            crosshairVisible: true,
+            hideCursorEnabled: true,
+            behavior: .showCrosshair,
+            isOptionPressed: false
+        ))
+        XCTAssertTrue(OptionKeyBehaviorPolicy.shouldHideNativeCursor(
+            crosshairVisible: true,
+            hideCursorEnabled: true,
+            behavior: .showCrosshair,
+            isOptionPressed: true
+        ))
+        XCTAssertFalse(OptionKeyBehaviorPolicy.shouldHideNativeCursor(
+            crosshairVisible: true,
+            hideCursorEnabled: true,
+            behavior: .toggleNativeCursor,
+            isOptionPressed: true
+        ))
+        XCTAssertTrue(OptionKeyBehaviorPolicy.shouldHideNativeCursor(
+            crosshairVisible: true,
+            hideCursorEnabled: false,
+            behavior: .toggleNativeCursor,
+            isOptionPressed: true
+        ))
+    }
+
+    func testFullProfilePreservesOptionKeyBehavior() throws {
+        let configuration = CrosshairConfiguration(
+            advanced: .default,
+            appearance: CrosshairConfiguration.default.appearance,
+            isVisible: true,
+            hideNativeCursor: true,
+            holdToShow: true,
+            optionKeyBehavior: .toggleNativeCursor
+        )
+
+        let restored = try JSONDecoder().decode(
+            CrosshairConfiguration.self,
+            from: JSONEncoder().encode(configuration)
+        )
+
+        XCTAssertEqual(restored.optionKeyBehavior, .toggleNativeCursor)
+    }
+
+    func testLegacyFullProfileDefaultsOptionKeyBehaviorToCrosshairHold() throws {
+        let configuration = CrosshairConfiguration.default
+        var serialized = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(configuration)) as? [String: Any]
+        )
+        serialized.removeValue(forKey: "optionKeyBehavior")
+
+        let restored = try JSONDecoder().decode(
+            CrosshairConfiguration.self,
+            from: JSONSerialization.data(withJSONObject: serialized)
+        )
+
+        XCTAssertEqual(restored.optionKeyBehavior, .showCrosshair)
+    }
+
 
     func testAdvancedOverlaySettingsSanitizeAndRoundTrip() throws {
         let settings = AdvancedOverlaySettings(

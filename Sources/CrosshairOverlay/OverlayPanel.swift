@@ -49,7 +49,10 @@ class OverlayPanel: NSPanel {
             return
         }
         let optionIsHeld = CGEventSource.flagsState(.combinedSessionState).contains(.maskAlternate)
-        if settings.holdToShow && !optionIsHeld {
+        if settings.holdToShow && !OptionKeyBehaviorPolicy.shouldShowCrosshair(
+            behavior: settings.optionKeyBehavior,
+            isOptionPressed: optionIsHeld
+        ) {
             orderOut(nil)
             return
         }

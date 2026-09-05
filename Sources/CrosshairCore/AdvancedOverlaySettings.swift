@@ -260,14 +260,43 @@ public struct CrosshairConfiguration: Codable, Equatable, Sendable {
     public let isVisible: Bool
     public let hideNativeCursor: Bool
     public let holdToShow: Bool
+    public let optionKeyBehavior: OptionKeyBehavior
 
-    public init(advanced: AdvancedOverlaySettings, appearance: CrosshairAppearanceConfiguration, isVisible: Bool, hideNativeCursor: Bool, holdToShow: Bool) {
+    public init(
+        advanced: AdvancedOverlaySettings,
+        appearance: CrosshairAppearanceConfiguration,
+        isVisible: Bool,
+        hideNativeCursor: Bool,
+        holdToShow: Bool,
+        optionKeyBehavior: OptionKeyBehavior = .showCrosshair
+    ) {
         self.advanced = advanced
         self.appearance = appearance
         self.isVisible = isVisible
         self.hideNativeCursor = hideNativeCursor
         self.holdToShow = holdToShow
+        self.optionKeyBehavior = optionKeyBehavior
     }
+
+    enum CodingKeys: String, CodingKey {
+        case advanced
+        case appearance
+        case isVisible
+        case hideNativeCursor
+        case holdToShow
+        case optionKeyBehavior
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        advanced = try container.decode(AdvancedOverlaySettings.self, forKey: .advanced)
+        appearance = try container.decode(CrosshairAppearanceConfiguration.self, forKey: .appearance)
+        isVisible = try container.decode(Bool.self, forKey: .isVisible)
+        hideNativeCursor = try container.decode(Bool.self, forKey: .hideNativeCursor)
+        holdToShow = try container.decode(Bool.self, forKey: .holdToShow)
+        optionKeyBehavior = try container.decodeIfPresent(OptionKeyBehavior.self, forKey: .optionKeyBehavior) ?? .showCrosshair
+    }
+
 }
 
 public enum OverlayProfileResolver {
@@ -287,7 +316,8 @@ public enum OverlayProfileResolver {
             appearance: base.appearance,
             isVisible: base.isVisible,
             hideNativeCursor: base.hideNativeCursor,
-            holdToShow: base.holdToShow
+            holdToShow: base.holdToShow,
+            optionKeyBehavior: base.optionKeyBehavior
         )
     }
 }
@@ -321,7 +351,8 @@ public struct FullAppProfiles: Codable, Equatable, Sendable {
                     appearance: defaultConfiguration.appearance,
                     isVisible: defaultConfiguration.isVisible,
                     hideNativeCursor: defaultConfiguration.hideNativeCursor,
-                    holdToShow: defaultConfiguration.holdToShow
+                    holdToShow: defaultConfiguration.holdToShow,
+                    optionKeyBehavior: defaultConfiguration.optionKeyBehavior
                 )
             )
         }

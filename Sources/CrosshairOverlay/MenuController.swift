@@ -270,10 +270,19 @@ class MenuController {
         menu.addItem(presetsItem)
 
         let behaviorMenu = NSMenu(title: "Behavior")
-        let holdItem = NSMenuItem(title: "Hold Option to Show", action: #selector(toggleHoldToShow(_:)), keyEquivalent: "")
-        holdItem.target = self
-        holdItem.state = settings.holdToShow ? .on : .off
-        behaviorMenu.addItem(holdItem)
+        let optionKeyMenu = NSMenu(title: "Option Key")
+        for (index, title) in ["Off", OptionKeyBehavior.showCrosshair.title, OptionKeyBehavior.toggleNativeCursor.title].enumerated() {
+            let item = NSMenuItem(title: title, action: #selector(selectOptionKeyBehavior(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            item.state = (index == 0 && !settings.holdToShow) ||
+                (index == 1 && settings.holdToShow && settings.optionKeyBehavior == .showCrosshair) ||
+                (index == 2 && settings.holdToShow && settings.optionKeyBehavior == .toggleNativeCursor) ? .on : .off
+            optionKeyMenu.addItem(item)
+        }
+        let optionKeyItem = NSMenuItem(title: "Option Key", action: nil, keyEquivalent: "")
+        optionKeyItem.submenu = optionKeyMenu
+        behaviorMenu.addItem(optionKeyItem)
         let exclusionItem = NSMenuItem(title: "Toggle Exclusion for Frontmost App", action: #selector(toggleFrontmostApplicationExclusion), keyEquivalent: "")
         exclusionItem.target = self
         behaviorMenu.addItem(exclusionItem)
@@ -585,9 +594,21 @@ class MenuController {
         buildMenu()
     }
 
-    @objc private func toggleHoldToShow(_ sender: NSMenuItem) {
-        settings.holdToShow.toggle()
-        sender.state = settings.holdToShow ? .on : .off
+    @objc private func selectOptionKeyBehavior(_ sender: NSMenuItem) {
+        switch sender.tag {
+        case 1:
+            settings.holdToShow = true
+            settings.optionKeyBehavior = .showCrosshair
+        case 2:
+            settings.holdToShow = true
+            settings.optionKeyBehavior = .toggleNativeCursor
+        default:
+            settings.holdToShow = false
+        }
+        settings.save()
+        cursorController.apply(setting: settings.shouldHideNativeCursor && settings.cursorMode == .experimentalBackground)
+        overlayPanel.updateCursorLocation(NSEvent.mouseLocation)
+        buildMenu()
     }
 
     @objc private func toggleFrontmostApplicationExclusion() {

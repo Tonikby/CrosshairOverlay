@@ -63,9 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let timer = Timer(timeInterval: 0.016, repeats: true) { _ in
                 let location = NSEvent.mouseLocation
                 Task { @MainActor in
-                    if settings.shouldHideNativeCursor && settings.cursorMode == .experimentalBackground {
-                        cursorController.reassertHidden()
-                    }
+                    cursorController.apply(setting: settings.shouldHideNativeCursor && settings.cursorMode == .experimentalBackground)
                     panel.updateCursorLocation(location)
                 }
             }

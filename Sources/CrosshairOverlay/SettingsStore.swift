@@ -1,4 +1,5 @@
 import Cocoa
+import Quartz
 import CrosshairCore
 
 final class SettingsStore: @unchecked Sendable {
@@ -23,6 +24,7 @@ final class SettingsStore: @unchecked Sendable {
     var cursorMode: CursorMode = .experimentalBackground
     var reticle: ReticleStyle = .cross
     var holdToShow = false
+    var optionKeyBehavior: OptionKeyBehavior = .showCrosshair
     var excludedBundleIdentifiers = Set<String>()
     var displayProfiles = DisplayProfiles(defaultSettings: .default)
     var presetLibrary = PresetLibrary.builtIn
@@ -32,9 +34,18 @@ final class SettingsStore: @unchecked Sendable {
     private var activeApplicationIdentifier: String?
 
     var shouldHideNativeCursor: Bool {
-        CursorVisibilityPolicy.shouldHideCursor(
+        let optionIsPressed = CGEventSource.flagsState(.combinedSessionState).contains(.maskAlternate)
+        guard holdToShow else {
+            return CursorVisibilityPolicy.shouldHideCursor(
+                crosshairVisible: isVisible,
+                hideCursorEnabled: hideNativeCursor
+            )
+        }
+        return OptionKeyBehaviorPolicy.shouldHideNativeCursor(
             crosshairVisible: isVisible,
-            hideCursorEnabled: hideNativeCursor
+            hideCursorEnabled: hideNativeCursor,
+            behavior: optionKeyBehavior,
+            isOptionPressed: optionIsPressed
         )
     }
 
@@ -83,7 +94,8 @@ final class SettingsStore: @unchecked Sendable {
             appearance: appearanceConfiguration,
             isVisible: isVisible,
             hideNativeCursor: hideNativeCursor,
-            holdToShow: holdToShow
+            holdToShow: holdToShow,
+            optionKeyBehavior: optionKeyBehavior
         )
     }
 
@@ -99,6 +111,7 @@ final class SettingsStore: @unchecked Sendable {
         isVisible = configuration.isVisible
         hideNativeCursor = configuration.hideNativeCursor
         holdToShow = configuration.holdToShow
+        optionKeyBehavior = configuration.optionKeyBehavior
     }
 
     func activateDisplayProfile(_ identifier: String) {
@@ -209,6 +222,7 @@ final class SettingsStore: @unchecked Sendable {
             "hideNativeCursor": hideNativeCursor,
             "advancedSettings": advancedSettings.encoded(),
             "holdToShow": holdToShow,
+            "optionKeyBehavior": optionKeyBehavior.rawValue,
             "excludedBundleIdentifiers": Array(excludedBundleIdentifiers).sorted()
         ]
         if let data = try? JSONEncoder().encode(displayProfiles) { values["displayProfiles"] = data }
@@ -235,6 +249,9 @@ final class SettingsStore: @unchecked Sendable {
         if let value = values["hideNativeCursor"] as? Bool { hideNativeCursor = value }
         if let data = values["advancedSettings"] as? Data, let advanced = try? AdvancedOverlaySettings.decode(from: data) { apply(advanced) }
         if let value = values["holdToShow"] as? Bool { holdToShow = value }
+        if let value = values["optionKeyBehavior"] as? String, let behavior = OptionKeyBehavior(rawValue: value) {
+            optionKeyBehavior = behavior
+        }
         if let values = values["excludedBundleIdentifiers"] as? [String] { excludedBundleIdentifiers = Set(values) }
         if let data = values["displayProfiles"] as? Data, let profiles = try? JSONDecoder().decode(DisplayProfiles.self, from: data) { displayProfiles = profiles }
         if let data = values["presetLibrary"] as? Data, let library = try? JSONDecoder().decode(PresetLibrary.self, from: data) { presetLibrary = library }
