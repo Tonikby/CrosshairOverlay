@@ -104,15 +104,13 @@ final class SettingsStore: @unchecked Sendable {
     func activateDisplayProfile(_ identifier: String) {
         guard activeDisplayIdentifier != identifier else { return }
         activeDisplayIdentifier = identifier
-        if let profile = displayProfiles.perDisplay[identifier] {
-            apply(profile)
-        }
+        applyActiveProfileOverrides()
     }
 
     func activateAppProfile(_ bundleIdentifier: String?) {
         guard activeApplicationIdentifier != bundleIdentifier else { return }
         activeApplicationIdentifier = bundleIdentifier
-        apply(fullAppProfiles.configuration(for: bundleIdentifier))
+        applyActiveProfileOverrides()
     }
 
     func saveAppProfile(_ bundleIdentifier: String) {
@@ -121,6 +119,7 @@ final class SettingsStore: @unchecked Sendable {
 
     func removeAppProfile(_ bundleIdentifier: String) {
         fullAppProfiles.profiles.removeAll { $0.bundleIdentifier == bundleIdentifier }
+        applyActiveProfileOverrides()
     }
 
     func saveActiveDisplayProfile() {
@@ -131,6 +130,7 @@ final class SettingsStore: @unchecked Sendable {
     func removeActiveDisplayProfile() {
         guard let activeDisplayIdentifier else { return }
         displayProfiles.perDisplay.removeValue(forKey: activeDisplayIdentifier)
+        applyActiveProfileOverrides()
     }
 
     enum IntersectionShape: String {
@@ -192,6 +192,10 @@ final class SettingsStore: @unchecked Sendable {
     private let savedSettingsKey = "CrosshairOverlay.savedSettings"
 
     func save() {
+        if fullAppProfiles.profile(for: activeApplicationIdentifier) == nil,
+           activeDisplayIdentifier.flatMap({ displayProfiles.perDisplay[$0] }) == nil {
+            fullAppProfiles.defaultConfiguration = configuration
+        }
         var values: [String: Any] = [
             "crosshairColor": archive(crosshairColor),
             "lineWidth": Double(lineWidth),
@@ -244,7 +248,18 @@ final class SettingsStore: @unchecked Sendable {
         } else {
             fullAppProfiles = FullAppProfiles(legacyProfiles: appProfiles, defaultConfiguration: configuration)
         }
+        fullAppProfiles.defaultConfiguration = configuration
         return true
+    }
+
+    private func applyActiveProfileOverrides() {
+        let displaySettings = activeDisplayIdentifier.flatMap { displayProfiles.perDisplay[$0] }
+        let appConfiguration = fullAppProfiles.profile(for: activeApplicationIdentifier)
+        apply(OverlayProfileResolver.configuration(
+            base: fullAppProfiles.defaultConfiguration,
+            displaySettings: displaySettings,
+            appConfiguration: appConfiguration
+        ))
     }
 
     private func archive(_ color: NSColor) -> Data {

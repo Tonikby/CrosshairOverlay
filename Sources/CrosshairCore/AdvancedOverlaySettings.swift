@@ -270,6 +270,28 @@ public struct CrosshairConfiguration: Codable, Equatable, Sendable {
     }
 }
 
+public enum OverlayProfileResolver {
+    public static func configuration(
+        base: CrosshairConfiguration,
+        displaySettings: AdvancedOverlaySettings?,
+        appConfiguration: CrosshairConfiguration?
+    ) -> CrosshairConfiguration {
+        if let appConfiguration {
+            return appConfiguration
+        }
+        guard let displaySettings else {
+            return base
+        }
+        return CrosshairConfiguration(
+            advanced: displaySettings,
+            appearance: base.appearance,
+            isVisible: base.isVisible,
+            hideNativeCursor: base.hideNativeCursor,
+            holdToShow: base.holdToShow
+        )
+    }
+}
+
 public struct FullAppProfile: Codable, Equatable, Sendable {
     public let bundleIdentifier: String
     public let configuration: CrosshairConfiguration
@@ -307,7 +329,12 @@ public struct FullAppProfiles: Codable, Equatable, Sendable {
 
     public func configuration(for bundleIdentifier: String?) -> CrosshairConfiguration {
         guard let bundleIdentifier else { return defaultConfiguration }
-        return profiles.first { $0.bundleIdentifier == bundleIdentifier }?.configuration ?? defaultConfiguration
+        return profile(for: bundleIdentifier) ?? defaultConfiguration
+    }
+
+    public func profile(for bundleIdentifier: String?) -> CrosshairConfiguration? {
+        guard let bundleIdentifier else { return nil }
+        return profiles.first { $0.bundleIdentifier == bundleIdentifier }?.configuration
     }
 
     public mutating func save(bundleIdentifier: String, configuration: CrosshairConfiguration) {

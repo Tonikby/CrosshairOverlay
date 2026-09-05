@@ -26,6 +26,7 @@ class OverlayPanel: NSPanel {
         self.isOpaque = false
         self.alphaValue = 1.0
         self.ignoresMouseEvents = true
+        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
         // Create crosshair view
         crosshairView = CrosshairView(settings: settings)

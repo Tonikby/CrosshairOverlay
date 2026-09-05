@@ -151,6 +151,35 @@ final class CursorVisibilityTests: XCTestCase {
         XCTAssertEqual(profiles.settings(for: "Missing"), defaults)
     }
 
+    func testFullAppProfileOverridesDisplayAdvancedSettings() {
+        let base = CrosshairConfiguration.default
+        let displaySettings = AdvancedOverlaySettings(opacity: 0.4, lineGap: 16, reticle: .ring)
+        let appOverride = CrosshairConfiguration(
+            advanced: .init(opacity: 0.8, lineGap: 4, reticle: .chevron),
+            appearance: .init(
+                lineColor: .init(red: 1, green: 0, blue: 0, alpha: 1),
+                lineWidth: 4,
+                pattern: .solid,
+                dotColor: .init(red: 0, green: 1, blue: 0, alpha: 1),
+                shadeColor: .init(red: 0, green: 0, blue: 0, alpha: 1),
+                showDot: true,
+                showShade: false
+            ),
+            isVisible: true,
+            hideNativeCursor: false,
+            holdToShow: false
+        )
+
+        XCTAssertEqual(
+            OverlayProfileResolver.configuration(base: base, displaySettings: displaySettings, appConfiguration: nil).advanced,
+            displaySettings
+        )
+        XCTAssertEqual(
+            OverlayProfileResolver.configuration(base: base, displaySettings: displaySettings, appConfiguration: appOverride),
+            appOverride
+        )
+    }
+
     func testConfigurationExportUsesVersionedValidatedEnvelope() throws {
         let original = AdvancedOverlaySettings(opacity: 0.45, lineGap: 12, reticle: .chevron)
         let data = ConfigurationExport(settings: original).encoded()
