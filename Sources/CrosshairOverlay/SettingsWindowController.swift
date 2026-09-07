@@ -167,7 +167,16 @@ final class SettingsWindowController: NSWindowController {
         addRow("Hide Native Cursor", control: cursorSwitch, to: stack)
         addRow("Opacity", control: sliderRow(opacitySlider, opacityValue), to: stack)
         addRow("Center Gap", control: sliderRow(gapSlider, gapValue), to: stack)
-        return stack.superview!
+        let container = stack.superview!
+        let quitButton = NSButton(title: "Quit Crosshair Overlay", target: self, action: #selector(quit))
+        quitButton.bezelStyle = .rounded
+        quitButton.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(quitButton)
+        NSLayoutConstraint.activate([
+            quitButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -22),
+            quitButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -18)
+        ])
+        return container
     }
 
     private func appearanceContent() -> NSView {
@@ -414,5 +423,9 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func openGitHub() {
         NSWorkspace.shared.open(AboutInformation.repositoryURL)
+    }
+
+    @objc private func quit() {
+        NSApp.terminate(nil)
     }
 }
