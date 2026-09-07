@@ -9,6 +9,18 @@ final class CursorVisibilityTests: XCTestCase {
         )
     }
 
+    func testAboutInformationIdentifiesProjectAuthorAndRepository() {
+        XCTAssertEqual(AboutInformation.appName, "Crosshair Overlay")
+        XCTAssertEqual(AboutInformation.author, "Tonikby")
+        XCTAssertEqual(AboutInformation.repositoryURL.absoluteString, "https://github.com/Tonikby/CrosshairOverlay")
+        XCTAssertEqual(AboutInformation.creationCredit, "AI-created with Hermes Agent")
+    }
+
+    func testSettingsTabsDefineAllControlGroupsAndPictograms() {
+        XCTAssertEqual(SettingsTab.allCases.map(\.title), ["General", "Appearance", "Reticle", "Behavior", "Profiles", "About"])
+        XCTAssertEqual(SettingsTab.allCases.map(\.symbolName), ["power", "paintbrush", "scope", "cursorarrow", "slider.horizontal.3", "info.circle"])
+    }
+
     func testGlobalHotkeysRequireControlShiftAndCommand() {
         XCTAssertEqual(
             GlobalHotkey.action(
@@ -73,6 +85,13 @@ final class CursorVisibilityTests: XCTestCase {
     func testOverlayWindowLevelIsAbovePopUpMenus() {
         XCTAssertGreaterThan(OverlayWindowLevelPolicy.alwaysOnTopRawValue, 101)
         XCTAssertEqual(OverlayWindowLevelPolicy.alwaysOnTopRawValue, 1000)
+    }
+
+    func testSettingsWindowLevelStaysBelowTheCrosshairOverlay() {
+        XCTAssertLessThan(
+            OverlayWindowLevelPolicy.settingsWindowRawValue,
+            OverlayWindowLevelPolicy.alwaysOnTopRawValue
+        )
     }
 
     func testCursorIsHiddenOnlyWhileCrosshairIsVisible() {

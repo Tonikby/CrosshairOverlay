@@ -91,9 +91,14 @@ class OverlayPanel: NSPanel {
         alphaValue = shouldFade ? 0 : settings.opacity
         crosshairView.needsDisplay = true
 
-        // Show if visible
+        // Keep the panel's WindowServer visibility in sync with the setting.
+        // Settings-window controls call this method directly rather than
+        // toggleVisibility(), so turning lines off must explicitly order out
+        // an already-visible panel.
         if settings.isVisible {
-            self.orderFront(nil)
+            orderFront(nil)
+        } else {
+            orderOut(nil)
         }
     }
 
