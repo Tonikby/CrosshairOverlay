@@ -7,6 +7,7 @@ final class SettingsWindowController: NSWindowController {
     private let overlayPanel: OverlayPanel
     private let cursorController: CursorController
     private let tabs: NSTabView
+    private let tabSelector: NSSegmentedControl
     private var profileTargetBundleIdentifier: String?
 
     private var crosshairSwitch: NSSwitch!
@@ -37,7 +38,21 @@ final class SettingsWindowController: NSWindowController {
 
         let tabs = NSTabView()
         self.tabs = tabs
-        self.tabs.tabViewType = .topTabsBezelBorder
+        self.tabs.tabViewType = .noTabsNoBorder
+        let tabSelector = NSSegmentedControl()
+        self.tabSelector = tabSelector
+        self.tabSelector.segmentCount = SettingsTab.allCases.count
+        self.tabSelector.trackingMode = .selectOne
+        for (index, tab) in SettingsTab.allCases.enumerated() {
+            let image = NSImage(
+                systemSymbolName: tab.symbolName,
+                accessibilityDescription: tab.title
+            )?.withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
+            image?.isTemplate = true
+            self.tabSelector.setImage(image, forSegment: index)
+            self.tabSelector.setToolTip(tab.title, forSegment: index)
+        }
+        self.tabSelector.selectedSegment = 0
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 246),
             styleMask: [.borderless, .nonactivatingPanel, .utilityWindow],
@@ -56,19 +71,28 @@ final class SettingsWindowController: NSWindowController {
         roundedContent.layer?.backgroundColor = NSColor.white.cgColor
         roundedContent.layer?.cornerRadius = 12
         roundedContent.layer?.masksToBounds = true
+        tabSelector.translatesAutoresizingMaskIntoConstraints = false
         tabs.translatesAutoresizingMaskIntoConstraints = false
+        roundedContent.addSubview(tabSelector)
         roundedContent.addSubview(tabs)
         NSLayoutConstraint.activate([
+            tabSelector.leadingAnchor.constraint(equalTo: roundedContent.leadingAnchor, constant: 22),
+            tabSelector.trailingAnchor.constraint(equalTo: roundedContent.trailingAnchor, constant: -22),
+            tabSelector.topAnchor.constraint(equalTo: roundedContent.topAnchor, constant: 8),
+            tabSelector.heightAnchor.constraint(equalToConstant: 28),
             tabs.leadingAnchor.constraint(equalTo: roundedContent.leadingAnchor),
             tabs.trailingAnchor.constraint(equalTo: roundedContent.trailingAnchor),
-            tabs.topAnchor.constraint(equalTo: roundedContent.topAnchor, constant: 8),
+            tabs.topAnchor.constraint(equalTo: tabSelector.bottomAnchor, constant: 6),
             tabs.bottomAnchor.constraint(equalTo: roundedContent.bottomAnchor)
         ])
         panel.contentView = roundedContent
         panel.level = NSWindow.Level(rawValue: OverlayWindowLevelPolicy.settingsWindowRawValue)
 
         super.init(window: panel)
+        tabSelector.target = self
+        tabSelector.action = #selector(tabChanged(_:))
         configureTabs(tabs)
+        selectTab(at: 0)
         refresh()
     }
 
@@ -79,7 +103,7 @@ final class SettingsWindowController: NSWindowController {
     func show(relativeTo statusButton: NSStatusBarButton?) {
         refresh()
         guard let window else { return }
-        tabs.selectTabViewItem(at: 0)
+        selectTab(at: 0)
         if let statusButton, let statusWindow = statusButton.window {
             let statusFrame = statusButton.convert(statusButton.bounds, to: nil)
             let screenFrame = statusWindow.convertToScreen(statusFrame)
@@ -133,13 +157,19 @@ final class SettingsWindowController: NSWindowController {
 
     private func makePane(_ tab: SettingsTab, content: NSView) -> NSTabViewItem {
         let item = NSTabViewItem(identifier: tab)
-        item.label = tab.title
-        item.image = NSImage(
-            systemSymbolName: tab.symbolName,
-            accessibilityDescription: tab.title
-        )?.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+        item.label = ""
         item.view = content
         return item
+    }
+
+    private func selectTab(at index: Int) {
+        tabSelector.selectedSegment = index
+        tabs.selectTabViewItem(at: index)
+    }
+
+    @objc private func tabChanged(_ sender: NSSegmentedControl) {
+        guard sender.selectedSegment >= 0 else { return }
+        selectTab(at: sender.selectedSegment)
     }
 
     private func contentStack() -> NSStackView {
