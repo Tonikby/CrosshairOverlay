@@ -67,6 +67,8 @@ class MenuController {
             settingsWindowController.window?.orderOut(nil)
             return
         }
+        let targetBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        settingsWindowController.setProfileTarget(targetBundleIdentifier == Bundle.main.bundleIdentifier ? nil : targetBundleIdentifier)
         settingsWindowController.show(relativeTo: statusItem.button)
     }
 

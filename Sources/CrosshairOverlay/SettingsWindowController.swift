@@ -6,6 +6,7 @@ final class SettingsWindowController: NSWindowController {
     private let settings: SettingsStore
     private let overlayPanel: OverlayPanel
     private let cursorController: CursorController
+    private var profileTargetBundleIdentifier: String?
 
     private var crosshairSwitch: NSSwitch!
     private var cursorSwitch: NSSwitch!
@@ -87,6 +88,10 @@ final class SettingsWindowController: NSWindowController {
         }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    func setProfileTarget(_ bundleIdentifier: String?) {
+        profileTargetBundleIdentifier = bundleIdentifier
     }
 
     func refresh() {
@@ -394,14 +399,14 @@ final class SettingsWindowController: NSWindowController {
     }
 
     @objc private func saveFrontmostApplicationProfile() {
-        guard let bundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+        guard let bundleIdentifier = profileTargetBundleIdentifier,
               bundleIdentifier != Bundle.main.bundleIdentifier else { return }
         settings.saveAppProfile(bundleIdentifier)
         settings.save()
     }
 
     @objc private func clearFrontmostApplicationProfile() {
-        guard let bundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+        guard let bundleIdentifier = profileTargetBundleIdentifier,
               bundleIdentifier != Bundle.main.bundleIdentifier else { return }
         settings.removeAppProfile(bundleIdentifier)
         applyChanges()
