@@ -6,6 +6,7 @@ final class SettingsWindowController: NSWindowController {
     private let settings: SettingsStore
     private let overlayPanel: OverlayPanel
     private let cursorController: CursorController
+    private let tabs: NSTabView
     private var profileTargetBundleIdentifier: String?
 
     private var crosshairSwitch: NSSwitch!
@@ -35,7 +36,8 @@ final class SettingsWindowController: NSWindowController {
         self.cursorController = cursorController
 
         let tabs = NSTabView()
-        tabs.tabViewType = .topTabsBezelBorder
+        self.tabs = tabs
+        self.tabs.tabViewType = .topTabsBezelBorder
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 246),
             styleMask: [.borderless, .nonactivatingPanel, .utilityWindow],
@@ -77,6 +79,7 @@ final class SettingsWindowController: NSWindowController {
     func show(relativeTo statusButton: NSStatusBarButton?) {
         refresh()
         guard let window else { return }
+        tabs.selectTabViewItem(at: 0)
         if let statusButton, let statusWindow = statusButton.window {
             let statusFrame = statusButton.convert(statusButton.bounds, to: nil)
             let screenFrame = statusWindow.convertToScreen(statusFrame)
@@ -174,7 +177,7 @@ final class SettingsWindowController: NSWindowController {
         container.addSubview(quitButton)
         NSLayoutConstraint.activate([
             quitButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -22),
-            quitButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -18)
+            quitButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8)
         ])
         return container
     }
