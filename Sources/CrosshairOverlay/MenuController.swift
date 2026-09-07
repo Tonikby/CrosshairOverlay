@@ -11,6 +11,7 @@ class MenuController {
     var cursorController: CursorController
     private enum ColorSelection { case crosshair, dot, shade }
     private var colorSelection: ColorSelection = .crosshair
+    private var settingsWindowController: SettingsWindowController!
 
     init(settings: SettingsStore, overlayPanel: OverlayPanel, cursorController: CursorController) {
         self.settings = settings
@@ -45,11 +46,31 @@ class MenuController {
         icon.isTemplate = true
 
         statusItem.button?.image = icon
+        settingsWindowController = SettingsWindowController(
+            settings: settings,
+            overlayPanel: overlayPanel,
+            cursorController: cursorController
+        )
         
         buildMenu()
     }
 
     func buildMenu() {
+        statusItem.menu = nil
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(showSettingsWindow)
+        settingsWindowController?.refresh()
+    }
+
+    @objc private func showSettingsWindow() {
+        if settingsWindowController.window?.isVisible == true {
+            settingsWindowController.window?.orderOut(nil)
+            return
+        }
+        settingsWindowController.show(relativeTo: statusItem.button)
+    }
+
+    private func buildLegacyMenu() {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -332,6 +353,10 @@ class MenuController {
         let diagnosticsItem = NSMenuItem(title: "Diagnostics…", action: #selector(showDiagnostics), keyEquivalent: "")
         diagnosticsItem.target = self
         menu.addItem(diagnosticsItem)
+
+        let aboutItem = NSMenuItem(title: "About Crosshair Overlay", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
 
         menu.addItem(.separator())
         
@@ -687,6 +712,23 @@ class MenuController {
         """
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    @objc private func showAbout() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let alert = NSAlert()
+        alert.messageText = AboutInformation.appName
+        alert.informativeText = """
+        Version \(version)
+        Created by \(AboutInformation.author)
+        \(AboutInformation.creationCredit)
+        \(AboutInformation.repositoryURL.absoluteString)
+        """
+        alert.addButton(withTitle: "Open GitHub")
+        alert.addButton(withTitle: "OK")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(AboutInformation.repositoryURL)
+        }
     }
 
     @objc func quit() {
