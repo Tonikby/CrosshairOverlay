@@ -134,7 +134,10 @@ final class SettingsWindowController: NSWindowController {
     private func makePane(_ tab: SettingsTab, content: NSView) -> NSTabViewItem {
         let item = NSTabViewItem(identifier: tab)
         item.label = tab.title
-        item.image = NSImage(systemSymbolName: tab.symbolName, accessibilityDescription: tab.title)
+        item.image = NSImage(
+            systemSymbolName: tab.symbolName,
+            accessibilityDescription: tab.title
+        )?.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
         item.view = content
         return item
     }
@@ -171,7 +174,9 @@ final class SettingsWindowController: NSWindowController {
         addRow("Opacity", control: sliderRow(opacitySlider, opacityValue), to: stack)
         addRow("Center Gap", control: sliderRow(gapSlider, gapValue), to: stack)
         let container = stack.superview!
-        let quitButton = NSButton(title: "Quit Crosshair Overlay", target: self, action: #selector(quit))
+        let quitButton = NSButton(title: "Quit", target: self, action: #selector(quit))
+        quitButton.image = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit")
+        quitButton.imagePosition = .imageLeft
         quitButton.bezelStyle = .rounded
         quitButton.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(quitButton)
