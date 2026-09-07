@@ -19,8 +19,8 @@ class OverlayPanel: NSPanel {
             defer: false
         )
 
-        // Stay above all windows but let clicks pass through
-        self.level = .floating
+        // Stay above status-bar and contextual menus while letting clicks pass through.
+        self.level = NSWindow.Level(rawValue: OverlayWindowLevelPolicy.alwaysOnTopRawValue)
         self.hasShadow = false
         self.backgroundColor = .clear
         self.isOpaque = false

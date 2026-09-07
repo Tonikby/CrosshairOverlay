@@ -70,6 +70,11 @@ final class CursorVisibilityTests: XCTestCase {
         XCTAssertEqual(LineWidthPolicy.restoredWidth(.nan, fallback: 1), 1)
     }
 
+    func testOverlayWindowLevelIsAbovePopUpMenus() {
+        XCTAssertGreaterThan(OverlayWindowLevelPolicy.alwaysOnTopRawValue, 101)
+        XCTAssertEqual(OverlayWindowLevelPolicy.alwaysOnTopRawValue, 1000)
+    }
+
     func testCursorIsHiddenOnlyWhileCrosshairIsVisible() {
         XCTAssertTrue(CursorVisibilityPolicy.shouldHideCursor(
             crosshairVisible: true,
