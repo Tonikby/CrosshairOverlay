@@ -66,9 +66,11 @@ final class SettingsWindowController: NSWindowController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        let roundedContent = NSView()
+        let roundedContent = NSVisualEffectView()
+        roundedContent.material = .menu
+        roundedContent.blendingMode = .behindWindow
+        roundedContent.state = .active
         roundedContent.wantsLayer = true
-        roundedContent.layer?.backgroundColor = NSColor.white.cgColor
         roundedContent.layer?.cornerRadius = 12
         roundedContent.layer?.masksToBounds = true
         tabSelector.translatesAutoresizingMaskIntoConstraints = false
